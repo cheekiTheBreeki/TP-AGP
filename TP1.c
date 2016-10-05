@@ -10,7 +10,7 @@ int traiteligne(char *string,FILE *fichierRej);
 int verifChecksum (int taille, char check) ;
 char recupligne(FILE *fichier, char *string);
 
-int charHexInt(char car){
+int charHexInt(char car){//transforme un char en int suivant une base hexadécimale
 
 	int ret;
 
@@ -54,16 +54,16 @@ int charHexInt(char car){
 	return ret;
 }
 
-int calcTaille(char *string){
+int calcTaille(char *string){ //calcule la taille d'une trame
 	int count=0;
 	while(*(string+count)!='\n'){
 		count++;
 	}
-	return count-2;
+	return count;
 }
 
 
-char getchecksum(char* string){
+char getchecksum(char* string){ //renvoie le checksum d'une trame
 	int count=0;
 	while (*(string+count)!='\n'){
 		count++;
@@ -72,49 +72,52 @@ char getchecksum(char* string){
 }
 
 int getFichier(char*string){
-	return *string;
+	return atoi(string);
 }
 
-int traiteligne(char *string,FILE*fichierRej){
+int traiteligne(char *string,FILE*fichierRej){//traite la ligne (verifie le checksum, le fichier, redirige vers les rejets...)
 	//Recup 1er char *string (
 	int cible=0;
 	int count=0;
 	int i;
-	int taille=calcTaille(string);
+	int taille=calcTaille(string)-2;
 	char check=getchecksum(string);
 	int fichier=getFichier(string);
 
 	char tabTemp [65];
 
-	if(verifChecksum(taille,check)==1){//A REFAIRE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		for(i=0; i<65; i++) {
-			tabTemp[i]=*(string+i+1);
-		}
-		tabTemp[64]='\0';
-		for(i=0;i<65;i++){
-			*(string+i)=tabTemp[i];
-		}
-		*(string+64)='\0';
-						//JUSQUE LAAAAAAAAAAAAAAAAA !!!!!!!!!!!!!!!!!!!!!!
-	}else{
-		for(i=1;i<taille+1;i++){
+	if(verifChecksum(taille,check)==0){ //Si on a un rejet
+		for(i=0;i<taille+2;i++){
 			fputc(*(string+i),fichierRej);
 		}
 		fputc('\n',fichierRej);
+		fichier=0;
+					
+	}else{ //si on a un checksum correct, on décale string et on supprime ses derniers termes
+		for(i=0;i<taille;i++){
+			tabTemp[i]=string[i+1];
+		}
+		for(i=0;i<taille;i++){
+			string[i]=tabTemp[i];
+		}
+		for(i=taille;i<taille+2;i++){ //
+			string[i]='\0';
+		}	
 
 	}
 
 	return fichier;
 }
 
-int verifChecksum (int taille, char check) {
-	if ((taille%16)==(charHexInt(check))){ 
+int verifChecksum (int taille, char check) { //vérifie si le checksum est correct
+	if ((taille%16)==(charHexInt(check))||(check<'A'&&check>'F')||(check<'a'&&check>'f')||(check<'0'&&check>'9')){ 
 		return 1;
 	}
+
 	return 0;
 }
 
-char recupligne(FILE *fichier, char *string){
+char recupligne(FILE *fichier, char *string){//lit une ligne du fichier et la stocke dans une chaine
 	int endloop=1;
 	char caract;
 	int count=0;
@@ -129,12 +132,21 @@ char recupligne(FILE *fichier, char *string){
 	}
 	return caract;
 }
+void ecritLigne(char* trame,FILE*fichier){
+	int i;	
+	for(i=0;i<calcTaille(trame)+10;i++){
+		fputc(*(trame+i),fichier);
+	}
+//	fputc('\n',fichier);
+}
 
 int main (){
 	FILE *fichier;
 	char tramTemp [68];
 	int i;
 	int fichNum;
+
+	//On créé tous les fichiers cibles
 
 	FILE *fichier1,*fichier2,*fichier3,*fichier4,*fichier5,*fichierRej;
 	fichier1=fopen("fichier1","w");
@@ -143,20 +155,26 @@ int main (){
 	fichier4=fopen("fichier4","w");
 	fichier5=fopen("fichier5","w");
 	fichierRej=fopen("fichierRej","w");
-	for( i=0;i<68;i++){
+
+
+	for( i=0;i<68;i++){		//On fait en sorte que la chaine soit remplie de \0
 		tramTemp[i]='\0';
 	}
+
+
 	fichier = fopen("/home/bruck/Documents/data.sujet","r");
+
 	if (fichier==NULL){
 		exit(-1);
 	}else{
-		while(recupligne(fichier,tramTemp)!=EOF){
+		while(recupligne(fichier,tramTemp)!=EOF){ //Tant qu'on est pas arrivé à la fin du fichier on met une ligne après l'autre dans tramTemp
 
-			for( i=0;i<68;i++){
-				tramTemp[i]='\0';
-			}
-			fichNum = traiteligne(tramTemp,fichierRej);
-			switch (fichNum) { 
+			
+
+
+			fichNum = traiteligne(tramTemp,fichierRej); //On analyse la ligne
+
+			switch (fichNum) { //On la redirige vers le fichier correspondant
 				case 1:
 					ecritLigne(tramTemp, fichier1);
 					break;
@@ -172,7 +190,11 @@ int main (){
 				case 5:
 					ecritLigne(tramTemp, fichier5);
 					break;
-			}	
+			}
+
+			for( i=0;i<68;i++){		//Même chose qu'avant
+				tramTemp[i]='\0';
+			}
 		}
 	}
 
